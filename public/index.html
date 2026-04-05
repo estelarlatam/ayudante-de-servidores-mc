@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>MasterMC — Panel Avanzado</title>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+:root{
+  --bg:#0b0d14;--card:#13161f;--card2:#1a1d2a;--border:#252836;
+  --green:#4ade80;--red:#f87171;--yellow:#fbbf24;--blue:#60a5fa;
+  --purple:#a78bfa;--orange:#fb923c;--cyan:#22d3ee;
+  --text:#e2e8f0;--muted:#4a5568;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
+
+/* LOGIN */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;
+  background:radial-gradient(ellipse at 50% 30%,#1a1040 0%,#0b0d14 70%);}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:20px;
+  padding:52px 44px;width:380px;text-align:center;
+  box-shadow:0 30px 60px rgba(0,0,0,.6),0 0 0 1px rgba(167,139,250,.1);}
+.login-logo{font-size:56px;margin-bottom:14px;filter:drop-shadow(0 0 20px #a78bfa88);}
+.login-box h1{font-size:24px;font-weight:800;margin-bottom:6px;
+  background:linear-gradient(135deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.login-box p{color:var(--muted);font-size:13px;margin-bottom:30px;}
+.login-box input{width:100%;background:#0b0d14;border:1px solid var(--border);border-radius:10px;
+  padding:13px 16px;color:var(--text);font-size:15px;margin-bottom:14px;outline:none;transition:border-color .2s;}
+.login-box input:focus{border-color:var(--purple);}
+.login-box button{width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);border:none;
+  border-radius:10px;padding:13px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;
+  transition:opacity .2s,transform .1s;}
+.login-box button:hover{opacity:.9;transform:translateY(-1px);}
+#login-error{color:var(--red);font-size:13px;margin-top:12px;min-height:18px;}
+
+/* PANEL */
+#panel{display:none;}
+header{background:var(--card);border-bottom:1px solid var(--border);
+  padding:12px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;}
+header .logo{font-size:30px;filter:drop-shadow(0 0 10px #a78bfa66);}
+header h1{font-size:17px;font-weight:800;background:linear-gradient(135deg,#a78bfa,#60a5fa);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+header .sub{color:var(--muted);font-size:12px;}
+.hdr-badges{margin-left:auto;display:flex;gap:10px;align-items:center;}
+.badge{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:700;border:1px solid;}
+.badge.online{background:rgba(74,222,128,.12);color:var(--green);border-color:var(--green);}
+.badge.offline{background:rgba(248,113,113,.12);color:var(--red);border-color:var(--red);}
+.badge.mode{background:rgba(167,139,250,.12);color:var(--purple);border-color:var(--purple);}
+.badge.kills{background:rgba(251,146,60,.12);color:var(--orange);border-color:var(--orange);}
+
+/* GRID */
+.grid{display:grid;grid-template-columns:280px 1fr 260px;grid-template-rows:auto auto 1fr;
+  gap:14px;padding:16px;max-width:1600px;margin:0 auto;}
+
+/* CARDS */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;}
+.card h2{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.08em;margin-bottom:14px;display:flex;align-items:center;gap:7px;}
+.card h2 span{font-size:16px;}
+
+/* STATS */
+.stats-card{grid-column:1;grid-row:1/3;}
+.stat-lbl{font-size:11px;color:var(--muted);margin-bottom:5px;}
+.stat-val{font-size:26px;font-weight:800;margin-bottom:6px;line-height:1;}
+.bar-wrap{background:#0b0d14;border-radius:6px;height:8px;overflow:hidden;margin-bottom:14px;}
+.bar{height:100%;border-radius:6px;transition:width .6s cubic-bezier(.4,0,.2,1);}
+.bar.hp{background:linear-gradient(90deg,#ef4444,#f87171);}
+.bar.food{background:linear-gradient(90deg,#d97706,#fbbf24);}
+.pos-box{background:#0b0d14;border-radius:8px;padding:10px 13px;font-family:monospace;
+  font-size:13px;color:var(--cyan);border:1px solid var(--border);margin-bottom:12px;}
+.stat-row2{display:flex;gap:8px;margin-bottom:14px;}
+.mini-stat{flex:1;background:#0b0d14;border:1px solid var(--border);border-radius:8px;
+  padding:10px;text-align:center;}
+.mini-stat .val{font-size:20px;font-weight:800;}
+.mini-stat .lbl{font-size:10px;color:var(--muted);margin-top:2px;}
+
+/* MAPA */
+.map-card{grid-column:2;grid-row:1;}
+#minimap{width:100%;height:200px;background:#0b0d14;border-radius:10px;
+  border:1px solid var(--border);position:relative;overflow:hidden;cursor:crosshair;}
+#map-canvas{width:100%;height:100%;}
+.map-coords{font-size:11px;color:var(--muted);margin-top:6px;font-family:monospace;}
+
+/* CONTROL */
+.control-card{grid-column:3;grid-row:1/3;}
+.ctrl-group{margin-bottom:16px;}
+.ctrl-group label{font-size:11px;color:var(--muted);display:block;margin-bottom:6px;font-weight:600;}
+.mode-btns{display:flex;flex-direction:column;gap:6px;}
+.mode-btn{background:#0b0d14;border:1px solid var(--border);border-radius:8px;
+  padding:9px 14px;color:var(--text);font-size:13px;font-weight:600;cursor:pointer;
+  text-align:left;transition:all .2s;display:flex;align-items:center;gap:8px;}
+.mode-btn:hover{border-color:var(--purple);color:var(--purple);}
+.mode-btn.active{background:rgba(167,139,250,.15);border-color:var(--purple);color:var(--purple);}
+.coord-inputs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;}
+.coord-inputs input{background:#0b0d14;border:1px solid var(--border);border-radius:6px;
+  padding:8px;color:var(--text);font-size:12px;text-align:center;width:100%;outline:none;}
+.coord-inputs input:focus{border-color:var(--blue);}
+.cmd-input{width:100%;background:#0b0d14;border:1px solid var(--border);border-radius:8px;
+  padding:9px 12px;color:var(--text);font-size:13px;outline:none;margin-bottom:8px;}
+.cmd-input:focus{border-color:var(--orange);}
+.btn{width:100%;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:700;
+  cursor:pointer;transition:opacity .2s;}
+.btn:hover{opacity:.85;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn.blue{background:var(--blue);color:#000;}
+.btn.orange{background:var(--orange);color:#000;}
+.btn.green{background:var(--green);color:#000;}
+
+/* INVENTARIO */
+.inv-card{grid-column:2;grid-row:2;}
+.inv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:8px;
+  max-height:180px;overflow-y:auto;}
+.inv-grid::-webkit-scrollbar{width:3px;}
+.inv-grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.inv-item{background:#0b0d14;border:1px solid var(--border);border-radius:8px;
+  padding:9px 6px;text-align:center;font-size:11px;transition:border-color .2s;cursor:default;}
+.inv-item:hover{border-color:var(--purple);}
+.inv-item .icon{font-size:20px;margin-bottom:3px;}
+.inv-item .name{color:var(--text);word-break:break-all;line-height:1.2;}
+.inv-item .count{color:var(--yellow);font-weight:800;font-size:12px;margin-top:2px;}
+.inv-empty{color:var(--muted);font-size:13px;padding:20px;text-align:center;grid-column:1/-1;}
+
+/* CHAT */
+.chat-card{grid-column:1/3;grid-row:3;display:flex;flex-direction:column;height:300px;}
+.chat-log{flex:1;overflow-y:auto;background:#0b0d14;border-radius:8px;padding:12px;
+  font-family:monospace;font-size:12px;line-height:1.7;margin-bottom:10px;border:1px solid var(--border);}
+.chat-log::-webkit-scrollbar{width:3px;}
+.chat-log::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.chat-line{display:flex;gap:8px;padding:1px 0;}
+.chat-line .time{color:var(--muted);flex-shrink:0;font-size:11px;}
+.chat-line .text{color:var(--text);word-break:break-word;}
+.chat-input-row{display:flex;gap:8px;}
+.chat-input-row input{flex:1;background:#0b0d14;border:1px solid var(--border);border-radius:8px;
+  padding:10px 13px;color:var(--text);font-size:13px;outline:none;transition:border-color .2s;}
+.chat-input-row input:focus{border-color:var(--purple);}
+.chat-input-row input::placeholder{color:var(--muted);}
+.chat-input-row button{background:var(--purple);border:none;border-radius:8px;
+  padding:10px 20px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .2s;}
+.chat-input-row button:hover{opacity:.85;}
+.chat-input-row button:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ALERTAS */
+.alerts-card{grid-column:3;grid-row:3;display:flex;flex-direction:column;height:300px;}
+.alerts-log{flex:1;overflow-y:auto;background:#0b0d14;border-radius:8px;padding:10px;
+  font-size:12px;border:1px solid var(--border);}
+.alert-line{padding:4px 8px;border-radius:6px;margin-bottom:4px;
+  background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.2);
+  font-size:11px;color:var(--orange);}
+.alert-line .at{color:var(--muted);font-size:10px;display:block;margin-bottom:1px;}
+
+@media(max-width:1100px){
+  .grid{grid-template-columns:1fr 1fr;grid-template-rows:auto;}
+  .stats-card{grid-column:1;grid-row:1;}
+  .map-card{grid-column:2;grid-row:1;}
+  .control-card{grid-column:1/3;grid-row:2;}
+  .inv-card{grid-column:1/3;grid-row:3;}
+  .chat-card{grid-column:1;grid-row:4;height:260px;}
+  .alerts-card{grid-column:2;grid-row:4;height:260px;}
+}
+@media(max-width:650px){
+  .grid{grid-template-columns:1fr;}
+  .stats-card,.map-card,.control-card,.inv-card,.chat-card,.alerts-card{grid-column:1;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">🤖</div>
+    <h1>MasterMC Control</h1>
+    <p>Panel de administración avanzado</p>
+    <input type="password" id="pwd-input" placeholder="Contraseña de acceso" autocomplete="current-password"/>
+    <button onclick="doLogin()">Acceder al Panel</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- PANEL -->
+<div id="panel">
+  <header>
+    <div class="logo">🤖</div>
+    <div>
+      <h1>MasterMC Bot</h1>
+      <div class="sub">estelar_oficial.aternos.me:52863</div>
+    </div>
+    <div class="hdr-badges">
+      <div class="badge mode" id="mode-badge">⚙ SOCIAL</div>
+      <div class="badge kills" id="kills-badge">⚔ 0K / 0M</div>
+      <div class="badge offline" id="status-badge">⬤ Desconectado</div>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- STATS -->
+    <div class="card stats-card">
+      <h2><span>❤️</span> Estado del Bot</h2>
+      <div class="stat-lbl">Salud</div>
+      <div class="stat-val" id="hp-val" style="color:var(--red)">0 / 20</div>
+      <div class="bar-wrap"><div class="bar hp" id="hp-bar" style="width:0%"></div></div>
+      <div class="stat-lbl">Hambre</div>
+      <div class="stat-val" id="food-val" style="color:var(--yellow)">0 / 20</div>
+      <div class="bar-wrap"><div class="bar food" id="food-bar" style="width:0%"></div></div>
+      <div class="stat-lbl">Posición</div>
+      <div class="pos-box" id="pos-box">X: — &nbsp; Y: — &nbsp; Z: —</div>
+      <div class="stat-row2">
+        <div class="mini-stat">
+          <div class="val" id="kills-val" style="color:var(--orange)">0</div>
+          <div class="lbl">Kills</div>
+        </div>
+        <div class="mini-stat">
+          <div class="val" id="deaths-val" style="color:var(--red)">0</div>
+          <div class="lbl">Muertes</div>
+        </div>
+      </div>
+      <div class="stat-lbl">Estado</div>
+      <div id="bot-status" style="font-size:13px;color:var(--muted)">—</div>
+    </div>
+
+    <!-- MAPA -->
+    <div class="card map-card">
+      <h2><span>🗺️</span> Mini-Mapa (trayectoria)</h2>
+      <div id="minimap"><canvas id="map-canvas"></canvas></div>
+      <div class="map-coords" id="map-coords">Click en el mapa para mover el bot ahí</div>
+    </div>
+
+    <!-- CONTROL -->
+    <div class="card control-card">
+      <h2><span>🎮</span> Control Remoto</h2>
+
+      <div class="ctrl-group">
+        <label>MODO DE COMPORTAMIENTO</label>
+        <div class="mode-btns">
+          <button class="mode-btn" id="btn-farming" onclick="setMode('FARMING')">🪓 Farmeo de recursos</button>
+          <button class="mode-btn" id="btn-patrol"  onclick="setMode('PATROL')">🛡️ Patrullar zona</button>
+          <button class="mode-btn active" id="btn-social"  onclick="setMode('SOCIAL')">💬 Modo social</button>
+        </div>
+      </div>
+
+      <div class="ctrl-group">
+        <label>MOVER A COORDENADAS</label>
+        <div class="coord-inputs">
+          <input type="number" id="mx" placeholder="X" value="0"/>
+          <input type="number" id="my" placeholder="Y" value="64"/>
+          <input type="number" id="mz" placeholder="Z" value="0"/>
+        </div>
+        <button class="btn blue" id="move-btn" onclick="moveTo()" disabled>📍 Mover Bot</button>
+      </div>
+
+      <div class="ctrl-group">
+        <label>EJECUTAR COMANDO</label>
+        <input class="cmd-input" type="text" id="cmd-input" placeholder="/spawn, /kit, /warp ..." maxlength="255"/>
+        <button class="btn orange" id="cmd-btn" onclick="sendCommand()" disabled>⚡ Ejecutar</button>
+      </div>
+    </div>
+
+    <!-- INVENTARIO -->
+    <div class="card inv-card">
+      <h2><span>🎒</span> Inventario en Tiempo Real</h2>
+      <div class="inv-grid" id="inv-grid">
+        <div class="inv-empty">Sin items</div>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="card chat-card">
+      <h2><span>💬</span> Chat del Servidor</h2>
+      <div class="chat-log" id="chat-log"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Escribe como MasterMC..." maxlength="255" disabled/>
+        <button id="send-btn" onclick="sendChat()" disabled>Enviar</button>
+      </div>
+    </div>
+
+    <!-- ALERTAS -->
+    <div class="card alerts-card">
+      <h2><span>🔔</span> Alertas</h2>
+      <div class="alerts-log" id="alerts-log">
+        <div style="color:var(--muted);font-size:12px;padding:10px">Sin alertas</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ══ LOGIN ══════════════════════════════════════════════════════
+let authenticated = false;
+
+document.getElementById('pwd-input').addEventListener('keydown', e => {
+  if (e.key==='Enter') doLogin();
+});
+
+async function doLogin() {
+  const pwd = document.getElementById('pwd-input').value;
+  const err = document.getElementById('login-error');
+  err.textContent = '';
+  try {
+    const res  = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pwd})});
+    const data = await res.json();
+    if (data.ok) {
+      authenticated = true;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('panel').style.display = 'block';
+      initSocket();
+      initMap();
+    } else { err.textContent = '❌ Contraseña incorrecta'; }
+  } catch { err.textContent = '❌ Error de conexión'; }
+}
+
+// ══ SOCKET.IO ══════════════════════════════════════════════════
+let socket;
+
+function initSocket() {
+  socket = io();
+
+  socket.on('state', state => {
+    updateStats(state);
+    updateInventory(state.inventory);
+    updateStatus(state.connected, state.status);
+    updateMode(state.mode);
+    if (state.chatLog) renderChatHistory(state.chatLog);
+    if (state.posHistory) updateMap(state.posHistory, state.position);
+  });
+
+  socket.on('chat',  line  => addChatLine(line));
+  socket.on('alert', entry => addAlertLine(entry));
+
+  window._socket = socket;
+}
+
+// ══ STATS ══════════════════════════════════════════════════════
+function updateStats(s) {
+  const hp   = Math.max(0,Math.min(20,s.health||0));
+  const food = Math.max(0,Math.min(20,s.food||0));
+  document.getElementById('hp-val').textContent   = `${hp.toFixed(1)} / 20`;
+  document.getElementById('food-val').textContent = `${food} / 20`;
+  document.getElementById('hp-bar').style.width   = `${(hp/20)*100}%`;
+  document.getElementById('food-bar').style.width = `${(food/20)*100}%`;
+  const p = s.position||{};
+  document.getElementById('pos-box').textContent = `X: ${p.x??'—'}  Y: ${p.y??'—'}  Z: ${p.z??'—'}`;
+  document.getElementById('kills-val').textContent  = s.kills??0;
+  document.getElementById('deaths-val').textContent = s.deaths??0;
+  document.getElementById('kills-badge').textContent= `⚔ ${s.kills??0}K / ${s.deaths??0}M`;
+  document.getElementById('bot-status').textContent = s.status||'—';
+  if (s.posHistory) updateMap(s.posHistory, s.position);
+}
+
+function updateStatus(connected, statusText) {
+  const badge = document.getElementById('status-badge');
+  const input = document.getElementById('chat-input');
+  const sBtn  = document.getElementById('send-btn');
+  const mBtn  = document.getElementById('move-btn');
+  const cBtn  = document.getElementById('cmd-btn');
+  if (connected) {
+    badge.className='badge online'; badge.textContent='⬤ En línea';
+    input.disabled=sBtn.disabled=mBtn.disabled=cBtn.disabled=false;
+  } else {
+    badge.className='badge offline'; badge.textContent='⬤ Desconectado';
+    input.disabled=sBtn.disabled=mBtn.disabled=cBtn.disabled=true;
+  }
+  document.getElementById('bot-status').textContent=statusText||'—';
+}
+
+function updateMode(mode) {
+  document.getElementById('mode-badge').textContent = `⚙ ${mode||'—'}`;
+  ['farming','patrol','social'].forEach(m => {
+    document.getElementById(`btn-${m}`).classList.toggle('active', m.toUpperCase()===mode);
+  });
+}
+
+// ══ MINI-MAPA ══════════════════════════════════════════════════
+let canvas, ctx, posHistory=[], currentPos={x:0,y:0,z:0};
+const MAP_RANGE = 80; // bloques visibles en cada dirección
+
+function initMap() {
+  canvas = document.getElementById('map-canvas');
+  ctx    = canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  canvas.addEventListener('click', onMapClick);
+  drawMap();
+}
+
+function resizeCanvas() {
+  if (!canvas) return;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width  = rect.width;
+  canvas.height = rect.height;
+  drawMap();
+}
+
+function updateMap(history, pos) {
+  posHistory = history||[];
+  currentPos = pos||{x:0,y:0,z:0};
+  drawMap();
+}
+
+function worldToCanvas(wx, wz) {
+  if (!canvas) return {x:0,y:0};
+  const cx=canvas.width/2, cy=canvas.height/2;
+  const scale = Math.min(canvas.width,canvas.height)/(MAP_RANGE*2);
+  return {
+    x: cx + (wx - currentPos.x)*scale,
+    y: cy + (wz - currentPos.z)*scale,
+  };
+}
+
+function canvasToWorld(cx, cy) {
+  if (!canvas) return {x:0,z:0};
+  const ccx=canvas.width/2, ccy=canvas.height/2;
+  const scale = Math.min(canvas.width,canvas.height)/(MAP_RANGE*2);
+  return {
+    x: Math.round(currentPos.x+(cx-ccx)/scale),
+    z: Math.round(currentPos.z+(cy-ccy)/scale),
+  };
+}
+
+function drawMap() {
+  if (!ctx||!canvas) return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // Fondo
+  ctx.fillStyle='#0b0d14';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  // Grid
+  ctx.strokeStyle='#1a1d2a';
+  ctx.lineWidth=1;
+  const step=16, scale=Math.min(canvas.width,canvas.height)/(MAP_RANGE*2);
+  const cx=canvas.width/2, cy=canvas.height/2;
+  for(let x=-MAP_RANGE;x<=MAP_RANGE;x+=step){
+    const px=cx+x*scale;
+    ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,canvas.height);ctx.stroke();
+  }
+  for(let z=-MAP_RANGE;z<=MAP_RANGE;z+=step){
+    const py=cy+z*scale;
+    ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(canvas.width,py);ctx.stroke();
+  }
+  // Trayectoria
+  if (posHistory.length>1) {
+    ctx.strokeStyle='rgba(96,165,250,0.5)';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    const p0=worldToCanvas(posHistory[0].x,posHistory[0].z);
+    ctx.moveTo(p0.x,p0.y);
+    for(let i=1;i<posHistory.length;i++){
+      const p=worldToCanvas(posHistory[i].x,posHistory[i].z);
+      ctx.lineTo(p.x,p.y);
+    }
+    ctx.stroke();
+  }
+  // Bot (punto actual)
+  const bp=worldToCanvas(currentPos.x,currentPos.z);
+  ctx.fillStyle='#a78bfa';
+  ctx.shadowColor='#a78bfa';
+  ctx.shadowBlur=10;
+  ctx.beginPath();ctx.arc(bp.x,bp.y,6,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+  // Cruz central
+  ctx.strokeStyle='rgba(167,139,250,0.3)';
+  ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(cx-10,cy);ctx.lineTo(cx+10,cy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx,cy-10);ctx.lineTo(cx,cy+10);ctx.stroke();
+}
+
+function onMapClick(e) {
+  if (!socket) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width/rect.width;
+  const scaleY = canvas.height/rect.height;
+  const wx = canvasToWorld(
+    (e.clientX-rect.left)*scaleX,
+    (e.clientY-rect.top)*scaleY
+  );
+  const x=wx.x, z=wx.z, y=parseInt(document.getElementById('my').value)||64;
+  document.getElementById('mx').value=x;
+  document.getElementById('mz').value=z;
+  document.getElementById('map-coords').textContent=`Click: X:${x} Y:${y} Z:${z} — presiona "Mover Bot"`;
+}
+
+// ══ INVENTARIO ══════════════════════════════════════════════════
+const ICONS={
+  sword:'⚔️',axe:'🪓',pickaxe:'⛏️',shovel:'🪣',hoe:'🌾',
+  bow:'🏹',crossbow:'🏹',shield:'🛡️',trident:'🔱',
+  helmet:'🪖',chestplate:'🧥',leggings:'👖',boots:'👟',
+  apple:'🍎',bread:'🍞',beef:'🥩',porkchop:'🥓',chicken:'🍗',
+  salmon:'🐠',cod:'🐟',carrot:'🥕',potato:'🥔',melon:'🍈',
+  cookie:'🍪',cake:'🎂',milk:'🥛',honey:'🍯',berry:'🍒',
+  coal:'🪨',iron:'🔩',gold:'🥇',diamond:'💎',emerald:'💚',
+  netherite:'🖤',copper:'🟤',quartz:'⬜',redstone:'🔴',
+  torch:'🔦',chest:'📦',crafting:'🔨',furnace:'🔥',
+  log:'🪵',wood:'🪵',plank:'🪵',stone:'🪨',cobble:'🪨',
+  sand:'🏖️',dirt:'🟫',grass:'🌿',glass:'🔲',wool:'🐑',
+  leather:'🟤',string:'🧵',arrow:'➡️',bone:'🦴',
+  egg:'🥚',feather:'🪶',book:'📖',map:'🗺️',compass:'🧭',
+  bucket:'🪣',water:'💧',lava:'🌋',lantern:'🏮',flower:'🌸',
+  seed:'🌱',wheat:'🌾',default:'📦',
+};
+
+function getIcon(name) {
+  for(const[k,v]of Object.entries(ICONS)){if(name.includes(k))return v;}
+  return ICONS.default;
+}
+
+function updateInventory(items) {
+  const grid=document.getElementById('inv-grid');
+  if(!items||!items.length){grid.innerHTML='<div class="inv-empty">Inventario vacío</div>';return;}
+  grid.innerHTML=items.map(item=>{
+    const dn=item.name.replace(/_/g,' ');
+    return`<div class="inv-item" title="${item.name} · slot ${item.slot}">
+      <div class="icon">${getIcon(item.name)}</div>
+      <div class="name">${dn}</div>
+      <div class="count">×${item.count}</div>
+    </div>`;
+  }).join('');
+}
+
+// ══ CHAT ════════════════════════════════════════════════════════
+function renderChatHistory(lines) {
+  const log=document.getElementById('chat-log');
+  log.innerHTML='';
+  [...lines].reverse().forEach(l=>appendLine(l));
+  log.scrollTop=log.scrollHeight;
+}
+
+function addChatLine(line){appendLine(line);const log=document.getElementById('chat-log');log.scrollTop=log.scrollHeight;}
+
+function appendLine(line) {
+  const log=document.getElementById('chat-log');
+  const div=document.createElement('div');
+  div.className='chat-line';
+  const clean=(line.text||'').replace(/§[0-9a-fk-or]/gi,'');
+  div.innerHTML=`<span class="time">${line.time}</span><span class="text">${esc(clean)}</span>`;
+  log.appendChild(div);
+  while(log.children.length>120)log.removeChild(log.firstChild);
+}
+
+function sendChat() {
+  const input=document.getElementById('chat-input');
+  const msg=input.value.trim();
+  if(!msg||!socket)return;
+  socket.emit('chat',msg);
+  input.value='';
+}
+
+// ══ ALERTAS ═════════════════════════════════════════════════════
+function addAlertLine(entry) {
+  const log=document.getElementById('alerts-log');
+  if(log.querySelector('div[style]'))log.innerHTML='';
+  const div=document.createElement('div');
+  div.className='alert-line';
+  div.innerHTML=`<span class="at">${entry.time}</span>${esc(entry.text)}`;
+  log.insertBefore(div,log.firstChild);
+  while(log.children.length>20)log.removeChild(log.lastChild);
+}
+
+// ══ CONTROL ═════════════════════════════════════════════════════
+function setMode(mode) {
+  if(!socket)return;
+  socket.emit('setMode',mode);
+}
+
+function moveTo() {
+  if(!socket)return;
+  const x=parseInt(document.getElementById('mx').value)||0;
+  const y=parseInt(document.getElementById('my').value)||64;
+  const z=parseInt(document.getElementById('mz').value)||0;
+  socket.emit('moveTo',{x,y,z});
+  document.getElementById('map-coords').textContent=`Moviendo a X:${x} Y:${y} Z:${z}...`;
+}
+
+function sendCommand() {
+  const cmd=document.getElementById('cmd-input').value.trim();
+  if(!cmd||!socket)return;
+  socket.emit('command',cmd);
+  document.getElementById('cmd-input').value='';
+}
+
+// ══ UTILS ═══════════════════════════════════════════════════════
+function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// Keyboard shortcuts
+document.addEventListener('keydown',e=>{
+  if(!authenticated)return;
+  if(e.key==='Enter'){
+    const ci=document.getElementById('chat-input');
+    const cmd=document.getElementById('cmd-input');
+    if(document.activeElement===ci)sendChat();
+    if(document.activeElement===cmd)sendCommand();
+  }
+});
+</script>
+</body>
+</html>
